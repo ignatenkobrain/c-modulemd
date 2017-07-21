@@ -24,6 +24,7 @@ struct _ModulemdModule
   gchar *summary;
   guint64 version;
   gchar *description;
+  GHashTable *buildrequires;
 };
 
 G_DEFINE_TYPE (ModulemdModule, modulemd_module, G_TYPE_OBJECT)
@@ -35,6 +36,7 @@ enum {
   PROP_VERSION,
   PROP_SUMMARY,
   PROP_DESCRIPTION,
+  PROP_BUILDREQUIRES,
   N_PROPS
 };
 
@@ -235,6 +237,7 @@ modulemd_module_finalize (GObject *object)
   g_clear_pointer (&self->stream, g_free);
   g_clear_pointer (&self->summary, g_free);
   g_clear_pointer (&self->description, g_free);
+  g_clear_pointer (&self->buildrequires, g_hash_table_unref);
 
   G_OBJECT_CLASS (modulemd_module_parent_class)->finalize (object);
 }
@@ -267,6 +270,12 @@ modulemd_module_get_property (GObject    *object,
 
     case PROP_DESCRIPTION:
       g_value_set_string (value, modulemd_module_get_description (self));
+      break;
+
+    case PROP_BUILDREQUIRES:
+      if (self->buildrequires)
+        g_hash_table_ref (self->buildrequires);
+      g_value_set_boxed (value, self->buildrequires);
       break;
 
     default:
@@ -302,6 +311,12 @@ modulemd_module_set_property (GObject      *object,
 
     case PROP_DESCRIPTION:
       modulemd_module_set_description (self, g_value_get_string (value));
+      break;
+
+    case PROP_BUILDREQUIRES:
+      if (self->buildrequires)
+        g_hash_table_unref (self->buildrequires);
+      self->buildrequires = g_hash_table_ref (g_value_get_boxed (value));
       break;
 
     default:
@@ -350,6 +365,15 @@ modulemd_module_class_init (ModulemdModuleClass *klass)
                          "The description of module",
                          NULL,
                          (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  /**
+   * Module:buildrequires: (type GLib.HashTable(utf8,utf8)) (transfer container)
+   */
+  properties [PROP_BUILDREQUIRES] =
+    g_param_spec_boxed ("buildrequires",
+                        "BuildRequires of module",
+                        "The buildrequires of module",
+                        G_TYPE_HASH_TABLE,
+                        G_PARAM_READWRITE);
 
   g_object_class_install_properties (object_class, N_PROPS, properties);
 }
@@ -357,4 +381,6 @@ modulemd_module_class_init (ModulemdModuleClass *klass)
 static void
 modulemd_module_init (ModulemdModule *self)
 {
+  self->buildrequires = g_hash_table_new_full (g_str_hash, g_str_equal,
+                                               g_free, g_free);
 }
